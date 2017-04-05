@@ -1,0 +1,61 @@
+---
+title: "USA Tornados"
+author: "Jeremy Voisey"
+date: "3 April 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r library, include=FALSE}
+library(leaflet)
+library(lubridate)
+library(dplyr)
+```
+
+## Tornados in USA from 1996 to 2010
+Key - Year (Fatalaties, Injuries)
+
+Circle size is proportional to number of tornados in each state
+
+```{r download, cache = TRUE, message=FALSE}
+url <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+dest <- "FStormData.csv.bz2"
+if (!file.exists(dest)) {
+    download.file(url = url, destfile = dest)    
+}
+stormdata <- read.csv(dest, header = TRUE, stringsAsFactors = FALSE)
+stormdata$Date <- mdy_hms(stormdata$BGN_DATE)
+stormdata$Year <- year(stormdata$Date)
+```
+
+```{r tornado}
+tornadoData <- stormdata %>%
+    filter(Year >= 1996 & Year <= 2010 & EVTYPE == "TORNADO" & LATITUDE != 0 & LONGITUDE != 0) %>%
+    transmute(popup = paste(Year," (",FATALITIES,", ", INJURIES,")", sep = ""), lat = LATITUDE / 100, lng = -LONGITUDE /100, state = STATE)
+
+
+stateData <- tornadoData %>%
+    group_by(state) %>%
+    summarise(count = n(), lat = mean(lat), lng = mean(lng))
+```
+
+```{r map, message=FALSE}
+tornadoIcon <- makeIcon(
+  iconUrl = "tornadom.png",
+  iconWidth = 32, iconHeight = 32,
+  iconAnchorX = 16, iconAnchorY = 32
+)
+
+tornadoMap <- tornadoData %>%
+    leaflet() %>%
+    addTiles() %>%
+    addMarkers(popup = tornadoData$popup, icon = tornadoIcon,clusterOptions = markerClusterOptions())
+    tornadoMap <- with(stateData,addCircles(tornadoMap, weight = 1, radius = sqrt(count) * 10000, lat = lat, lng = lng))   
+tornadoMap
+```
+
+
+The data for this map was taken from the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database.
